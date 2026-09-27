@@ -1,5 +1,6 @@
 [tools]
 koka = "3.2.9"
+oha = "1.16.0"
 
 [env]
 # Headers of the libuv version bundled with Koka 3.2.9 (for `src/tcp.c`), and of llhttp (for `src/httpparse.c`).
@@ -32,7 +33,7 @@ description = "Run the TCP echo server on port 9000"
 run = "koka -isrc -e examples/echo.kk"
 
 [tasks.bench]
-description = "Benchmark the optimized server with ApacheBench (needs ab and python3)"
+description = "Benchmark the optimized server with oha (needs python3)"
 depends = ["release"]
 run = "sh test/bench.sh"
 

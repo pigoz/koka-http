@@ -1,6 +1,6 @@
 #!/bin/sh
-# Benchmark the optimized example server with ApacheBench: `mise run bench` (needs ab and python3).
-# Uses port 18180. ab runs on the same machine and is itself single-threaded.
+# Benchmark the optimized example server with oha: `mise run bench` (needs python3).
+# Uses port 18180. The server is single-threaded; oha runs on the same machine.
 set -u
 cd "$(dirname "$0")/.."
 ulimit -n 10240 2>/dev/null || true
@@ -12,18 +12,22 @@ pid=$!
 trap 'kill $pid 2>/dev/null' EXIT
 sleep 0.5
 
-summary() {  # extract requests/s, failures, and the median and 99th percentile latency from ab's output
-  awk '/Failed requests/ { failed = $3 }
-       /Requests per second/ { rps = $4 }
-       /^ *50%/ { p50 = $2 }
-       /^ *99%/ { p99 = $2 }
-       END { printf "%8.0f req/s   median %s ms   p99 %s ms   failed %s\n", rps, p50, p99, failed }'
+run() {  # label oha-arguments...
+  label=$1
+  shift
+  printf "%-48s" "$label"
+  oha --no-tui --output-format json "$@" "$url" 2>/dev/null | python3 -c '
+import json, sys
+d = json.load(sys.stdin); s = d["summary"]; p = d["latencyPercentiles"]
+print("%8.0f req/s   p50 %5.2f ms   p99 %5.2f ms   ok %5.1f%%" % (s["requestsPerSec"], p["p50"] * 1000, p["p99"] * 1000, s["successRate"] * 100))'
 }
 
-ab -q -k -n 20000 -c 50 "$url" > /dev/null   # warm up
+oha --no-tui -z 2s -c 50 "$url" > /dev/null 2>&1   # warm up
 
-printf "keep-alive, 50 connections          "; ab -q -k -n 200000 -c 50 "$url" | summary
-printf "new connection per request, 50      "; ab -q -n 50000 -c 50 "$url" | summary
+run "keep-alive, 50 connections"                 -z 10s -c 50
+run "keep-alive, 200 connections"                -z 10s -c 200
+# a short burst: on loopback, a sustained rate of new connections runs out of ports (TIME_WAIT)
+run "new connection per request, 50 at a time"   -n 20000 -c 50 --disable-keepalive
 
 # 2000 idle keep-alive connections (they stay open for the 10 s head timeout)
 python3 - "$port" <<'EOF' &
@@ -39,6 +43,6 @@ time.sleep(8)
 EOF
 idle=$!
 sleep 2
-printf "keep-alive, 50 + 2000 idle          "; ab -q -k -n 100000 -c 50 "$url" | summary
+run "keep-alive, 50 connections + 2000 idle"     -z 5s -c 50
 echo "server memory (RSS) with 2000+ connections: $(ps -o rss= -p $pid | tr -d ' ') KB"
 wait $idle

@@ -30,7 +30,7 @@ Needs [mise](https://mise.jdx.dev) (it installs Koka 3.2.9 and sets the C includ
 mise run serve          # build and run examples/web.kk on port 8080
 mise run test           # tests (needs python3)
 mise run test-asan      # the same tests on an AddressSanitizer build
-mise run bench          # benchmark the optimized build (needs ab)
+mise run bench          # benchmark the optimized build
 mise run release        # optimized build in .koka/web-release
 mise run echo           # TCP echo server on port 9000
 ```
@@ -65,17 +65,23 @@ a server with several pending accepts or the missing write timeout, are fixed he
 
 ## Performance
 
-`mise run bench`: optimized build, [ApacheBench](https://httpd.apache.org/docs/2.4/programs/ab.html)
-on the same machine (Apple M1 Max, macOS 15.3). The server is single-threaded, and so is `ab`,
-which limits these numbers too.
+`mise run bench`: optimized build, load from [oha](https://github.com/hatoo/oha) on the same
+machine (Apple M1 Max, macOS 15.3).
 
-| | requests/s | median | p99 |
+| | requests/s | p50 | p99 |
 |---|---:|---:|---:|
-| keep-alive, 50 connections | ~60,000 | 1 ms | 1 ms |
-| a new connection per request, 50 at a time | ~27,500 | 2 ms | 2–3 ms |
-| keep-alive, 50 connections, plus 2000 idle ones | ~59,000 | 1 ms | 1–2 ms |
+| keep-alive, 50 connections | 50,000–58,000 | 0.84 ms | 1–3 ms |
+| keep-alive, 200 connections | ~47,000 | 4.2 ms | 5.1 ms |
+| a new connection per request, 50 at a time | ~22,000 | 2.2 ms | 4.5 ms |
+| keep-alive, 50 connections, plus 2000 idle ones | ~57,000 | 0.85 ms | 1.5 ms |
 
-With 2000 open connections the server uses about 15 MB of memory (RSS).
+The server is single-threaded and these numbers are bound by it: under keep-alive load it uses
+one core fully (ApacheBench gives the same results). With more *active* connections each request
+costs a bit more: profiling shows the time going into the list of outstanding awaits of
+`std/async`, whose operations are linear in the number of active awaits. Idle connections cost
+nothing: with 2000 of them open the server uses about 15 MB of memory (RSS). The rate of new
+connections is measured in short bursts: on loopback, a sustained rate soon runs out of ports
+(`TIME_WAIT`).
 
 ## Layout
 
