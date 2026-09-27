@@ -11,8 +11,8 @@ failed=0
 pass() { echo "ok    $1"; }
 fail() { echo "FAIL  $1"; failed=$((failed + 1)); }
 
-build() {  # file output
-  if ! koka -isrc -c "$1" -o "$2" > .koka/test-build.log 2>&1; then
+build() {  # file output (extra compiler flags can be given in TEST_KOKA_FLAGS, see `mise run test-asan`)
+  if ! koka ${TEST_KOKA_FLAGS:-} -isrc -c "$1" -o "$2" > .koka/test-build.log 2>&1; then
     cat .koka/test-build.log
     fail "build $1"
     return 1

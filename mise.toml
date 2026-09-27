@@ -12,14 +12,14 @@ KOKA_OPTIONS = "--ccopts=-I{{config_root}}/vendor/libuv/include -I{{config_root}
 description = "Build the example web server (.koka/web)"
 run = [
   'for c in src/*.c; do kk="${c%.c}.kk"; if [ "$c" -nt "$kk" ]; then touch "$kk"; fi; done',
-  "koka -isrc -c examples/web.kk -o .koka/web",
+  "koka -v0 -isrc -c examples/web.kk -o .koka/web",
 ]
 
 [tasks.release]
 description = "Build an optimized web server (.koka/web-release)"
 run = [
   'for c in src/*.c; do kk="${c%.c}.kk"; if [ "$c" -nt "$kk" ]; then touch "$kk"; fi; done',
-  "koka -O2 -isrc -c examples/web.kk -o .koka/web-release",
+  "koka -v0 -O2 -isrc -c examples/web.kk -o .koka/web-release",
 ]
 
 [tasks.serve]
@@ -31,6 +31,16 @@ run = ".koka/web"
 description = "Run the TCP echo server on port 9000"
 run = "koka -isrc -e examples/echo.kk"
 
+[tasks.bench]
+description = "Benchmark the optimized server with ApacheBench (needs ab and python3)"
+depends = ["release"]
+run = "sh test/bench.sh"
+
 [tasks.test]
 description = "Run the tests (Koka programs and HTTP probes; needs python3)"
+run = "sh test/run.sh"
+
+[tasks.test-asan]
+description = "Run the tests on an AddressSanitizer build (which stops at the first memory error)"
+env = { TEST_KOKA_FLAGS = "--fasan --builddir=.koka-asan", ASAN_OPTIONS = "halt_on_error=1" }
 run = "sh test/run.sh"
