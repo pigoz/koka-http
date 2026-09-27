@@ -1,0 +1,36 @@
+[tools]
+koka = "3.2.9"
+
+[env]
+# Headers of the libuv version bundled with Koka 3.2.9 (for `src/tcp.c`), and of llhttp (for `src/httpparse.c`).
+# (`--ccopts` comes before Koka's own include paths, which contain /opt/homebrew/include)
+KOKA_OPTIONS = "--ccopts=-I{{config_root}}/vendor/libuv/include -I{{config_root}}/vendor/llhttp/include"
+
+# Koka does not rebuild a module when only the C file it includes (`extern import c file`) changed,
+# so the build tasks first touch the `.kk` file of any newer `.c` file.
+[tasks.build]
+description = "Build the example web server (.koka/web)"
+run = [
+  'for c in src/*.c; do kk="${c%.c}.kk"; if [ "$c" -nt "$kk" ]; then touch "$kk"; fi; done',
+  "koka -isrc -c examples/web.kk -o .koka/web",
+]
+
+[tasks.release]
+description = "Build an optimized web server (.koka/web-release)"
+run = [
+  'for c in src/*.c; do kk="${c%.c}.kk"; if [ "$c" -nt "$kk" ]; then touch "$kk"; fi; done',
+  "koka -O2 -isrc -c examples/web.kk -o .koka/web-release",
+]
+
+[tasks.serve]
+description = "Build and run the web server (optional argument: port, default 8080)"
+depends = ["build"]
+run = ".koka/web"
+
+[tasks.echo]
+description = "Run the TCP echo server on port 9000"
+run = "koka -isrc -e examples/echo.kk"
+
+[tasks.test]
+description = "Run the tests (Koka programs and HTTP probes; needs python3)"
+run = "sh test/run.sh"
